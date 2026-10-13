@@ -1,0 +1,1 @@
+{"private":true,"type":"module","description":"Optional DOM test dependencies only; not required to run the Django app.","dependencies":{"fake-indexeddb":"6.2.5","jsdom":"26.1.0"}}
