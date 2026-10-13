@@ -24,3 +24,16 @@ const w=week([{kind:'sale',quantity:2,unit_amount:10000,created:'2026-10-11T23:3
 assert.equal(w.length,7);assert.equal(w[0].key,'2026-10-06');assert.equal(w[6].amount,20000);assert.equal(sum(project(snapshot,queue).movements),55000);
 assert.ok(csv([[' =SUM(A1)','"quoted",line\nbreak']]).includes("' =SUM"));assert.ok(csv([['"hi"']]).includes('""hi""'));assert.equal(escapeHTML('<script>&"'), '&lt;script&gt;&amp;&quot;');
 console.log('PASS: offline projections, acknowledgement deduplication, conflicts, dependent product/purchase, validation, Lagos dates, totals, CSV safety and HTML escaping.');
+const advanced=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+const pid='11111111-1111-4111-8111-111111111111',rid='22222222-2222-4222-8222-222222222222';
+const base={account:{username:'owner'},products:[{id:pid,name:'Serum',stock:10,sellable:10,active:true}],movements:[],acknowledged_ids:[]};
+const cartOp={request_id:rid,kind:'checkout',lines:[{product_id:pid,quantity:3,unit_amount:100}],party:'Customer',payment:'Cash',created:'2026-10-13T10:00:00Z'};
+const pending=advanced.project(base,[{status:'pending',payload:cartOp}]);assert.equal(pending.products[0].stock,7);assert.equal(pending.receipts[0].total,300);assert.equal(pending.receipts[0].reference,'PENDING-'+rid.slice(0,8));
+assert.equal(advanced.project({...base,acknowledged_ids:[rid]},[{status:'pending',payload:cartOp}]).products[0].stock,10);
+advanced.validateStoredOperation(cartOp);assert.throws(()=>advanced.validateStoredOperation({...cartOp,lines:'bad'}),/cart/);assert.throws(()=>advanced.validateStoredOperation({...cartOp,lines:[{...cartOp.lines[0],quantity:-1}]}),/quantity/);
+assert.throws(()=>advanced.validateLocal({...cartOp,kind:'refund',movement_id:rid,quantity:1,reason:'Return'},base.products,{movements:[]}),/confirmed/);
+console.log('PASS: cart projections, pending receipts, operation acknowledgements, restore schema validation and local refund guards.');
+const expiredRefundBase={account:{username:'owner'},products:[{id:pid,name:'Serum',stock:0,sellable:0}],movements:[{id:rid,product_id:pid,kind:'sale',quantity:2,unit_amount:100,status:'synced',created:'2026-10-01T10:00:00Z'}],allocations:[{movement_id:rid,batch__expires:'2020-01-01',quantity:2,returned:0}]};
+const returnOp={request_id:'33333333-3333-4333-8333-333333333333',kind:'refund',movement_id:rid,quantity:1,restock:true,created:'2026-10-13T10:00:00Z'};
+const projectedReturn=advanced.project(expiredRefundBase,[{status:'pending',payload:returnOp}]);assert.equal(projectedReturn.products[0].stock,1);assert.equal(projectedReturn.products[0].sellable,0);
+console.log('PASS: offline returned expired batch is excluded from sellable stock.');

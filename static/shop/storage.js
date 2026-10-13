@@ -11,3 +11,6 @@ export const getQueue=key=>run('queue','readonly',s=>s.index('account').getAll(k
 export const putEntry=entry=>run('queue','readwrite',s=>s.put(entry));
 export const removeEntry=id=>run('queue','readwrite',s=>s.delete(id));
 export async function clearAccount(key){const queue=await getQueue(key);if(queue.length)throw Error('Sync or back up and explicitly discard pending records before signing out.');await run('snapshots','readwrite',s=>s.delete(key));await run('meta','readwrite',s=>s.delete('active'));}
+export async function importEntries(account,entries){
+ const db=await openDB();return new Promise((resolve,reject)=>{const tx=db.transaction('queue','readwrite');const store=tx.objectStore('queue');for(const e of entries){const request=store.get(e.id);request.onsuccess=()=>{if(!request.result)store.put({...e,account,status:e.status==='conflict'?'conflict':'pending'})}}tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)})
+}

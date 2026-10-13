@@ -1,7 +1,7 @@
 /* Only public shell and same-origin static assets are cached. Private HTML/API
    responses and CSRF tokens are never put in Cache Storage. */
-const CACHE='noriss-shell-v1';
-const ASSETS=['/offline-shell/','/manifest.webmanifest','/static/shop/app.css','/static/shop/app.js','/static/shop/core.js','/static/shop/storage.js','/static/shop/images/beauty-hero.webp','/static/shop/icons/icon-192.png','/static/shop/icons/icon-512.png','/static/shop/icons/maskable-512.png','/static/shop/icons/apple-touch-icon.png'];
+const CACHE='noriss-shell-v8';
+const ASSETS=['/offline-shell/','/manifest.webmanifest','/static/shop/app.css','/static/shop/app.js','/static/shop/core.js','/static/shop/enhancements.js','/static/shop/storage.js','/static/shop/images/beauty-hero.webp','/static/shop/icons/icon-192.png','/static/shop/icons/icon-512.png','/static/shop/icons/maskable-512.png','/static/shop/icons/apple-touch-icon.png'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS))));
 // No forced skipWaiting: an existing checkout keeps its version until next launch.
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('noriss-shell-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));

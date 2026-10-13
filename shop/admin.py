@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Store,Membership,Product,Movement,Operation
+from .models import Store,Membership,Product,Movement,Operation,Receipt,Batch,Allocation,Refund,Expense,Reconciliation,AuditLog,SyncConflict
 admin.site.site_header='Noriss Beautyquest Administration'
 admin.site.site_title='Noriss Admin'
 admin.site.register(Store)
@@ -24,3 +24,9 @@ class OperationAdmin(admin.ModelAdmin):
  def has_add_permission(self,request):return False
  def has_delete_permission(self,request,obj=None):return False
  def has_change_permission(self,request,obj=None):return False
+
+class ReadOnlyAdmin(admin.ModelAdmin):
+ def has_add_permission(self,request):return False
+ def has_change_permission(self,request,obj=None):return False
+ def has_delete_permission(self,request,obj=None):return False
+for model in [Receipt,Batch,Allocation,Refund,Expense,Reconciliation,AuditLog,SyncConflict]:admin.site.register(model,ReadOnlyAdmin)

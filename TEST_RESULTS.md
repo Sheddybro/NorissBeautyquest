@@ -1,9 +1,18 @@
-# Verification report
+# Version 2 verification report
 
-- Django 5.2.18 on Python 3.12.14.
-- 22 Django tests passed: login, membership, owner/cashier/viewer permissions, shop isolation, template/PWA routes, JSON and integer validation, CSRF, product retry deduplication, purchase/sale updates, oversell rollback, retry after restock, stock depletion, snapshots and offline timestamps.
-- JavaScript helper checks passed: offline projections, acknowledgement deduplication, conflict exclusion, product→purchase dependencies, quantity/price checks, Lagos dates, totals, CSV escaping and HTML escaping.
-- Service-worker simulations passed: precache list, offline navigation fallback, static response caching, API/auth/admin exclusions, private HTML not cached and app cache version cleanup.
-- Django-backed DOM/IndexedDB integration checks passed: product and purchase forms, offline sale persistence, reopening the workspace, reconnect acknowledgement, stock-conflict retention/retry, dependent offline product→purchase→sale sequence, search and clear-search state.
+Runtime: Django 5.2.18, Python 3.12.14, Node 24 for optional JavaScript verification.
 
-A real browser could not be installed in the execution environment: the Chromium download was incomplete. DOM/service-worker simulations do not substitute for physical-device tests. Browser installation prompts, service-worker lifecycle, visual layout, iOS/Android behaviour, interrupted device storage and production PostgreSQL concurrency are not certified here. Run the manual checklist on the intended HTTPS deployment before using it as the only shop record.
+## Passed
+
+- **90 Django regression/integration tests** including the original business/security cases, checkout atomic rollback, receipt sequence and retry behaviour, weighted inventory cost capture, unknown legacy costs, partial/over/damaged refunds, original-batch returns, FEFO and expired stock, product versions/archiving, unique barcodes, valid/invalid product photos, expenses and reconciliation, audit/acknowledgement snapshots, cashier restrictions, cross-shop isolation, confirmed receipt downloads and database backup verification/restoration.
+- **DOM + IndexedDB integration** against real Django HTTP endpoints: original offline purchase/sale sequence, reopening/reconnect, conflict retention/retry, product edits/barcodes, offline multi-item carts, pending/final receipts, restore merge/deduplication/account/schema validation, owner refunds, expenses, profit/batch/reconciliation/audit screens.
+- **JavaScript helper tests**: money/CSV/date functions, acknowledged-operation projections, cart/pending receipts, backup schema validation, refund guards and returned expired stock not becoming sellable.
+- **Service-worker simulations**: public shell/static precache, offline fallback, private/API/admin/auth exclusions and versioned cache cleanup. Enhancements are included in the offline precache.
+- **Upgrade smoke test**: applying migration 0002 to a real migration-0001 SQLite database preserved existing product/stock/price and marked unknown legacy cost honestly.
+- Django normal and production deployment checks, migration consistency and static collection.
+
+## Remaining deployment/device checks
+
+These tests do not run a real mobile browser. Actual camera scanning, printer/PDF dialogs, PWA installation, physical-device storage/eviction, screen layouts, multi-tab behaviour on browsers without Web Locks, and PostgreSQL concurrency/pg_dump/pg_restore must be verified on the intended HTTPS deployment. SQLite backup/checksum/restored-copy recovery was tested. The backup scheduler is supplied as a command; it must be started or scheduled by the host administrator.
+
+No live shop data, owner passwords, local test database, installed dependencies or server secrets are included in the ZIP.
