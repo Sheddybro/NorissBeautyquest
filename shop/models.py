@@ -7,10 +7,11 @@ class Store(models.Model):
  next_receipt=models.PositiveBigIntegerField(default=1)
  def __str__(self):return self.name
 class Membership(models.Model):
- ROLES=[('owner','Owner'),('cashier','Cashier'),('viewer','Viewer')]
+ ROLES=[('owner','Owner'),('staff','Staff'),('cashier','Cashier (legacy)'),('viewer','Viewer (legacy)')]
  user=models.OneToOneField(settings.AUTH_USER_MODEL,on_delete=models.CASCADE)
  store=models.ForeignKey(Store,on_delete=models.CASCADE)
  role=models.CharField(max_length=10,choices=ROLES,default='cashier')
+ permissions=models.JSONField(default=list,blank=True,help_text='Additional staff operation permissions; owner always has full access.')
  def __str__(self):return f'{self.user} · {self.store} · {self.role}'
 class Product(models.Model):
  id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
@@ -131,3 +132,44 @@ class SyncConflict(models.Model):
  message=models.CharField(max_length=400)
  resolved=models.BooleanField(default=False)
  updated=models.DateTimeField(auto_now=True)
+
+
+class Branch(models.Model):
+    """Future physical locations; existing Store remains the business boundary."""
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='branches')
+    name = models.CharField(max_length=120)
+    code = models.SlugField(max_length=32)
+    active = models.BooleanField(default=True)
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['store', 'code'], name='unique_branch_code_per_store')]
+        ordering = ['name']
+
+    def __str__(self):
+        return f'{self.store.name} / {self.name}'
+
+
+class PaymentAttempt(models.Model):
+    """Provider-neutral payment record; never stores card credentials."""
+    STATUSES = [('pending', 'Pending'), ('verified', 'Verified'), ('failed', 'Failed'),
+                ('cancelled', 'Cancelled'), ('refunded', 'Refunded')]
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    store = models.ForeignKey(Store, on_delete=models.PROTECT, related_name='payment_attempts')
+    receipt = models.ForeignKey(Receipt, null=True, blank=True, on_delete=models.PROTECT, related_name='payment_attempts')
+    provider = models.CharField(max_length=32, default='manual')
+    reference = models.CharField(max_length=120)
+    amount = models.PositiveBigIntegerField(help_text='Amount in kobo')
+    currency = models.CharField(max_length=3, default='NGN')
+    status = models.CharField(max_length=12, choices=STATUSES, default='pending')
+    provider_metadata = models.JSONField(default=dict, blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['provider', 'reference'], name='unique_provider_payment_reference'),
+                       models.CheckConstraint(condition=Q(amount__gt=0), name='payment_attempt_positive_amount')]
+        indexes = [models.Index(fields=['store', 'status'], name='payment_store_status_idx')]
+
+    def __str__(self):
+        return f'{self.provider}:{self.reference} ({self.status})'

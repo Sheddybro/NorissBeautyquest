@@ -23,7 +23,7 @@ class RetailTests(TestCase):
   app=self.client.get('/');self.assertContains(app,'Sync centre');self.assertContains(app,'entry-dialog');self.assertContains(app,'class="page-hero"');self.assertContains(app,'id="page-eyebrow"');self.assertContains(app,'aria-labelledby="page-title"');self.assertContains(self.client.get('/accounts/login/'),'Good to see you again.');offline=self.client.get('/offline-shell/');self.assertNotIn('csrfmiddlewaretoken',offline.content.decode());self.assertContains(offline,'app.js');self.assertContains(offline,'class="page-hero"')
  def test_pwa_endpoints(self):
   manifest=self.client.get('/manifest.webmanifest');self.assertEqual(manifest.status_code,200);self.assertEqual(manifest.json()['display'],'standalone');self.assertEqual(len(manifest.json()['icons']),3)
-  response=self.client.get('/sw.js');self.assertContains(response,'noriss-shell-v8');self.assertEqual(response['Service-Worker-Allowed'],'/');self.assertIn('no-cache',response['Cache-Control'])
+  response=self.client.get('/sw.js');self.assertContains(response,'noriss-shell-v9');self.assertEqual(response['Service-Worker-Allowed'],'/');self.assertIn('no-cache',response['Cache-Control'])
  def test_health(self):self.assertEqual(self.client.get('/health/').json(),{'status':'ok'})
  def test_product_validation(self):
   for fields in [{'name':' '},{'name':'x'*101},{'price':0},{'price':True},{'price':1.5},{'reorder':-1},{'category':''},{'request_id':'not-uuid'}]:
@@ -155,3 +155,56 @@ class DemoSeedTests(TestCase):
   self.assertTrue(all(m.party.startswith('Demo ') for m in Movement.objects.filter(kind='sale')))
   call_command('seed_demo',owner='demoowner',stdout=io.StringIO())
   self.assertEqual((Product.objects.count(),Movement.objects.count(),Operation.objects.count(),Receipt.objects.count(),Batch.objects.count(),Refund.objects.count(),Expense.objects.count(),Reconciliation.objects.count()),counts)
+
+class StaffPermissionTests(RetailTests):
+ def test_staff_defaults_and_owner_access(self):
+  from .permissions import can_operate
+  owner=Membership.objects.get(user=self.owner)
+  self.assertTrue(can_operate(owner,'refund'))
+  user=get_user_model().objects.create_user('staff-default')
+  member=Membership.objects.create(user=user,store=self.store,role='staff')
+  self.assertTrue(can_operate(member,'sale'))
+  self.assertFalse(can_operate(member,'refund'))
+  self.client.force_login(user)
+  account=self.client.get('/api/bootstrap/').json()['account']
+  self.assertEqual(account['allowed_operations'],['checkout','sale'])
+  self.assertEqual(self.post(self.product).status_code,403)
+ def test_owner_staff_management_api_and_metadata(self):
+  user=get_user_model().objects.create_user('existing-staff',password='StrongPass!2026')
+  Membership.objects.create(user=user,store=self.store,role='staff',permissions=['sale'])
+  self.client.force_login(self.owner)
+  boot=self.client.get('/api/bootstrap/').json()['account']
+  self.assertEqual(boot['store'],self.store.name)
+  self.assertTrue(any(member['username']=='existing-staff' for member in boot['staff_members']))
+  response=self.client.post('/api/owner/staff/',json.dumps({'username':'newcashier','password':'StrongPass!2026','role':'staff','permissions':['sale','checkout']}),content_type='application/json')
+  self.assertEqual(response.status_code,200)
+  new_user=get_user_model().objects.get(username='newcashier')
+  self.assertTrue(Membership.objects.filter(user=new_user,store=self.store,role='staff').exists())
+  self.assertIn('checkout',Membership.objects.get(user=new_user,store=self.store).permissions)
+ def test_owner_staff_endpoint_rejects_privilege_escalation(self):
+  owner_membership=Membership.objects.get(user=self.owner)
+  owner_role=self.client.post('/api/owner/staff/',json.dumps({'username':'attempt-owner','password':'StrongPass!2026','role':'owner'}),content_type='application/json')
+  self.assertEqual(owner_role.status_code,400)
+  self.assertFalse(get_user_model().objects.filter(username='attempt-owner').exists())
+  existing=get_user_model().objects.create_user('already-attached')
+  existing_membership=Membership.objects.create(user=existing,store=self.store,role='staff')
+  duplicate=self.client.post('/api/owner/staff/',json.dumps({'username':'already-attached','password':'StrongPass!2026','role':'staff'}),content_type='application/json')
+  self.assertEqual(duplicate.status_code,409)
+  self.assertEqual(Membership.objects.get(user=existing).id,existing_membership.id)
+  owner_update=self.client.post('/api/owner/staff/',json.dumps({'action':'update','user_id':self.owner.id,'username':self.owner.username,'role':'staff'}),content_type='application/json')
+  self.assertEqual(owner_update.status_code,403)
+  owner_membership.refresh_from_db()
+  self.assertEqual(owner_membership.role,'owner')
+ def test_staff_extra_permission_is_enforced_server_side(self):
+  user=get_user_model().objects.create_user('staff-inventory')
+  member=Membership.objects.create(user=user,store=self.store,role='staff',permissions=['product','purchase'])
+  self.client.force_login(user)
+  self.assertEqual(self.post(self.product).status_code,200)
+  self.assertEqual(self.post(self.move()).status_code,200)
+  self.assertEqual(self.post(self.move('sale',1)).status_code,200)
+  self.assertNotIn('refund',self.client.get('/api/bootstrap/').json()['account']['allowed_operations'])
+ def test_legacy_cashier_cannot_gain_extra_permissions(self):
+  from .permissions import can_operate
+  user=get_user_model().objects.create_user('legacy-limited')
+  member=Membership.objects.create(user=user,store=self.store,role='cashier',permissions=['product'])
+  self.assertFalse(can_operate(member,'product'))

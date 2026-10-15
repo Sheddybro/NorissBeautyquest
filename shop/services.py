@@ -7,6 +7,7 @@ from django.db.models import Sum
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from .models import (Membership,Store,Product,Movement,Operation,Receipt,Batch,Allocation,Refund,Expense,Reconciliation,AuditLog,SyncConflict)
+from .permissions import can_operate, permitted_operations
 class ShopError(Exception):
  def __init__(self,message,status=400):self.message,self.status=message,status
 
@@ -175,8 +176,7 @@ def _apply(user,member,p,fingerprint):
 
 def apply_operation(user,data):
  member=member_for(user);p=validate(data)
- if member.role=='viewer':raise ShopError('Viewer accounts cannot record transactions.',403)
- if member.role=='cashier' and p['kind'] not in ('sale','checkout'):raise ShopError('Only the owner can manage products, purchases, refunds, expenses and reconciliation.',403)
+ if not can_operate(member,p['kind']):raise ShopError('You do not have permission to perform this operation.',403)
  fp=hashlib.sha256(json.dumps(p,sort_keys=True).encode()).hexdigest()
  try:return _apply(user,member,p,fp)
  except IntegrityError:
@@ -194,11 +194,19 @@ def snapshot(user):
  with transaction.atomic():
   Store.objects.select_for_update().get(pk=member.store_id)
   products=list(Product.objects.filter(store=member.store).values('id','name','category','price','reorder','stock','barcode','photo','active','version'))
-  for p in products:p['id']=str(p['id']);p['sellable']=available(Product.objects.get(pk=p['id']),timezone.localdate())
+  # Compute expired inventory in one grouped query rather than one query per product.
+  expired_by_product = dict(Batch.objects.filter(
+   product__store=member.store,expires__lt=timezone.localdate()
+  ).values('product_id').annotate(total=Sum('quantity')).values_list('product_id','total'))
+  for p in products:
+   p['id']=str(p['id'])
+   p['sellable']=p['stock']-expired_by_product.get(p['id'],0)
   movements=list(Movement.objects.filter(store=member.store).values('id','product_id','product__name','product_name','kind','quantity','unit_amount','party','payment','created','recorded_by__username','receipt_id','cost_total','cost_known'))
   refunds=list(Refund.objects.filter(movement__store=member.store).values('id','movement_id','movement__product_id','quantity','amount','cost_total','restock','reason','payment','created'))
   receipts=[]
-  for r in Receipt.objects.filter(store=member.store):receipts.append({'id':str(r.id),'reference':r.reference,'party':r.party,'payment':r.payment,'created':r.created.isoformat(),'total':sum(m.quantity*m.unit_amount for m in r.items.all())})
+  # Prefetch receipt lines once to avoid a query for every receipt.
+  for r in Receipt.objects.filter(store=member.store).prefetch_related('items'):
+   receipts.append({'id':str(r.id),'reference':r.reference,'party':r.party,'payment':r.payment,'created':r.created.isoformat(),'total':sum(m.quantity*m.unit_amount for m in r.items.all())})
   batches=list(Batch.objects.filter(product__store=member.store,quantity__gt=0).values('id','product_id','product__name','code','expires','quantity'))
   allocations=list(Allocation.objects.filter(movement__store=member.store).values('movement_id','batch_id','batch__expires','quantity','returned'))
   expenses=list(Expense.objects.filter(store=member.store).values('id','description','amount','payment','created'))
@@ -213,5 +221,9 @@ def snapshot(user):
    for m in movements:m['cost_total']=0;m['cost_known']=False
    for r in refunds:r['cost_total']=0
   def serialise(rows):return json.loads(json.dumps(rows,default=lambda v:v.isoformat() if hasattr(v,'isoformat') else str(v)))
-  result={'account':{'key':f'{member.store_id}:{user.id}','user_id':user.id,'username':user.get_username(),'store_id':member.store_id,'store':member.store.name,'role':member.role},'products':products,'movements':serialise(movements),'refunds':serialise(refunds),'receipts':receipts,'batches':serialise(batches),'allocations':serialise(allocations),'expenses':serialise(expenses),'reconciliations':serialise(reconciliations),'audits':serialise(audits),'acknowledged_ids':[str(x) for x in Operation.objects.filter(store=member.store,user=user).values_list('id',flat=True)],'updated':timezone.now().isoformat()}
+  staff_members=[]
+  if member.role=='owner':
+   for row in Membership.objects.select_related('user').filter(store=member.store).order_by('user__username'):
+    staff_members.append({'id':row.user_id,'username':row.user.username,'role':row.role,'permissions':list(row.permissions or [])})
+  result={'account':{'key':f'{member.store_id}:{user.id}','user_id':user.id,'username':user.get_username(),'store_id':member.store_id,'store':member.store.name,'store_name':member.store.name,'role':member.role,'allowed_operations':permitted_operations(member),'staff_members':staff_members},'products':products,'movements':serialise(movements),'refunds':serialise(refunds),'receipts':receipts,'batches':serialise(batches),'allocations':serialise(allocations),'expenses':serialise(expenses),'reconciliations':serialise(reconciliations),'audits':serialise(audits),'acknowledged_ids':[str(x) for x in Operation.objects.filter(store=member.store,user=user).values_list('id',flat=True)],'updated':timezone.now().isoformat()}
   return result
