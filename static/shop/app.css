@@ -106,6 +106,17 @@ tbody tr:hover{background:#f7f8fe}
 .login-form input{border-color:#e0e5f0;border-radius:10px}
 .login-form input:focus{border-color:#9baeea;box-shadow:0 0 0 3px #edf1ff}
 .login-note code{background:#fff0f6;color:#a93670}
+.login-form .field{margin:0 0 12px}
+.password-input{position:relative}
+.toggle-password{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:var(--muted);font-size:16px;line-height:1;padding:6px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.toggle-password:hover{color:var(--ink)}
+.toggle-password:focus-visible{outline:3px solid #a997ee;outline-offset:2px}
+.toggle-password .eye-off{display:none}
+.toggle-password.showing .eye{display:none}
+.toggle-password.showing .eye-off{display:inline}
+.remember{margin:8px 0 14px;display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.remember input{accent-color:var(--blue);width:16px;height:16px}
+.login-form .full{width:100%}
 .avatar{background:#d84b93;border-color:#f39bc3;color:#fff}
 .offline-note{color:#77839d}
 .receipt-preview{border-color:#e5e8f1;border-radius:12px}
@@ -184,6 +195,17 @@ aside nav button.active{border-color:#303c62;box-shadow:inset 3px 0 #5278ed}
 .login-panel h2{color:#17234a}
 .login-form input:focus{border-color:#8197e5;box-shadow:0 0 0 3px #edf1ff}
 .login-note code{background:#f1edff;color:#6246bb}
+.login-form .field{margin:0 0 12px}
+.password-input{position:relative}
+.toggle-password{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:var(--muted);font-size:16px;line-height:1;padding:6px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.toggle-password:hover{color:var(--ink)}
+.toggle-password:focus-visible{outline:3px solid #a997ee;outline-offset:2px}
+.toggle-password .eye-off{display:none}
+.toggle-password.showing .eye{display:none}
+.toggle-password.showing .eye-off{display:inline}
+.remember{margin:8px 0 14px;display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.remember input{accent-color:var(--blue);width:16px;height:16px}
+.login-form .full{width:100%}
 @media(max-width:760px){aside{background:#090d18}.page-hero{background:#10182d}.welcome{background:#10182d}}
 .page-hero:after{filter:none}
 .eyebrow,.dialog-header .eyebrow{color:#6246bb}

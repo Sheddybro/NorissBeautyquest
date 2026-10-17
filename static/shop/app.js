@@ -126,8 +126,10 @@ document.querySelectorAll('[data-view]').forEach(n=>n.addEventListener('click',(
 $('primary-action').onclick=()=>openForm(state.view==='Inventory'?'product':state.view==='Purchases'?'purchase':'sale');$('hero-purchase').onclick=()=>openForm('purchase');$('view-inventory').onclick=()=>view('Inventory');$('search').oninput=e=>{state.search=e.target.value.trim();state.page=1;renderTable()};$('export-btn').onclick=exportRecords;$('previous-page').onclick=()=>{state.page--;renderTable()};$('next-page').onclick=()=>{state.page++;renderTable()};$('sync-btn').onclick=synchronise;$('retry-all').onclick=synchronise;$('backup-btn').onclick=backup;$('logout-btn').onclick=logout;
 $('entry-form').onsubmit=submit;$('close-dialog').onclick=()=>{if(!state.saving)$('entry-dialog').close()};$('entry-dialog').addEventListener('cancel',e=>{if(state.saving)e.preventDefault()});$('product-select').onchange=updatePrice;$('quantity').oninput=updateTotal;$('unit-amount').oninput=updateTotal;
 document.addEventListener('click',e=>{const empty=e.target.closest('[data-empty-action]');if(empty){if(empty.dataset.emptyAction==='clear'){state.search='';$('search').value='';renderTable()}else openForm(empty.dataset.emptyAction)}const q=e.target.closest('[data-queue-action]');if(q)queueAction(q.dataset.queueAction,q.dataset.id).catch(e=>notify(e.message,true))});
+const isPhone=/Android|iPhone|iPod|Mobile/i.test(navigator.userAgent);
+if(isPhone){$('install-help').hidden=true;$('install-btn').hidden=true;$('offline-readiness-badge').hidden=true;}
 $('install-help').onclick=()=>$('help-dialog').showModal();$('close-help').onclick=()=>$('help-dialog').close();
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;$('install-btn').hidden=false});$('install-btn').onclick=async()=>{if(!deferredPrompt)return;await deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$('install-btn').hidden=true};window.addEventListener('appinstalled',()=>{$('install-btn').hidden=true;notify('Noriss Beautyquest has been installed.')});
+window.addEventListener('beforeinstallprompt',e=>{if(isPhone)return;e.preventDefault();deferredPrompt=e;$('install-btn').hidden=false});$('install-btn').onclick=async()=>{if(!deferredPrompt)return;await deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$('install-btn').hidden=true};window.addEventListener('appinstalled',()=>{$('install-btn').hidden=true;notify('Noriss Beautyquest has been installed.')});
 window.addEventListener('online',synchronise);window.addEventListener('offline',()=>{state.connected=false;render()});document.addEventListener('visibilitychange',()=>{if(!document.hidden)synchronise()});
 channel?.addEventListener('message',()=>readLocal().catch(e=>notify(e.message,true)));
 async function checkOfflineShell(){
@@ -148,7 +150,7 @@ async function refreshOfflineReadiness(){
 async function start(){try{
  await storage.openDB();state.storageOK=true;await readLocal();
  if(navigator.storage?.persist)navigator.storage.persist().catch(()=>{});
- if('serviceWorker' in navigator&&window.isSecureContext){
+ if(!isPhone&&'serviceWorker' in navigator&&window.isSecureContext){
   try{
    const registration=await navigator.serviceWorker.register('/sw.js');
    registration.update().catch(()=>{});
@@ -156,9 +158,9 @@ async function start(){try{
    const ready=await Promise.race([navigator.serviceWorker.ready.then(()=>true),new Promise(resolve=>setTimeout(()=>resolve(false),20000))]);
    if(!ready)notify('Offline installation is still pending. Inspect /sw.js and its essential assets in DevTools.',true);
   }catch(e){notify('Offline installation failed: '+(e.message||String(e)),true);}
- }else notify('Offline installation requires HTTPS or localhost.',true);
+ }else if(!isPhone)notify('Offline installation requires HTTPS or localhost.',true);
  await synchronise();await refreshOfflineReadiness();
- navigator.serviceWorker?.addEventListener('controllerchange',()=>refreshOfflineReadiness());
+ if(!isPhone)navigator.serviceWorker?.addEventListener('controllerchange',()=>refreshOfflineReadiness());
  setInterval(()=>{if(!document.hidden)synchronise()},5000);
  }catch(e){notify('Offline storage is unavailable. '+e.message+'. No records will be accepted until storage is working.',true);state.storageOK=false;render()}}
 

@@ -6,3 +6,5 @@ __pycache__/
 .env
 staticfiles/
 .pytest_cache/
+.expo/
+node_modules/

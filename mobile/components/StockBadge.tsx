@@ -1,0 +1,4 @@
+import React from 'react';
+import {StyleSheet,Text,View} from 'react-native';
+export function StockBadge({available,active}:{available:number;active:boolean}){const kind=!active?'inactive':available<=0?'empty':available<=5?'low':'ready';const labels={inactive:'Inactive',empty:'Out of stock',low:'Low stock',ready:'In stock'};return <View style={[styles.badge,styles[kind]]}><Text style={[styles.text,kind==='ready'?styles.readyText:kind==='low'?styles.lowText:styles.emptyText]}>{labels[kind]}</Text></View>;}
+const styles=StyleSheet.create({badge:{alignSelf:'flex-start',borderRadius:9,paddingHorizontal:9,paddingVertical:4,marginTop:8},text:{fontSize:10,fontWeight:'800'},ready:{backgroundColor:'#e7f7ed'},low:{backgroundColor:'#fff3d6'},empty:{backgroundColor:'#feeceb'},inactive:{backgroundColor:'#f0f1f5'},readyText:{color:'#17653b'},lowText:{color:'#8a5708'},emptyText:{color:'#8b2b2b'}});
