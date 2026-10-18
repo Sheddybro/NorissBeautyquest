@@ -268,7 +268,7 @@ Your PythonAnywhere control-panel link is for managing the web app, not the app 
 
 On a phone, the first online sign-in and shell download are required. Clearing the browser's site data/cache removes the service worker and may remove the saved offline workspace; after clearing it, go online and sign in again before expecting offline launch. Offline mode cannot complete a first login or reinstall a cleared service worker.
 
-When updating app templates/assets, increment the `CACHE` version in `static/shop/sw.js` (currently `noriss-shell-v9`) so returning devices install the new shell. Do not force an update while a cashier is in a checkout form.
+When updating app templates/assets, increment the `CACHE` version in `static/shop/sw.js` (currently `noriss-shell-v10`) so returning devices install the new shell. Do not force an update while a cashier is in a checkout form.
 
 ## Tests
 
@@ -315,7 +315,7 @@ The DOM integration suite creates an isolated temporary database and QA user. It
 1. Before changing files, create and verify a database backup. Keep your existing database, environment variables and SECRET_KEY.
 2. Replace application source/static/templates with this version. Do not replace your database with a new empty file.
 3. Install updated requirements, then run `python manage.py migrate` and `python manage.py collectstatic --noinput`.
-4. Restart your Django service. The current service-worker cache version is `noriss-shell-v9`; close/reopen the app to finish the update after preserving/syncing local records.
+4. Restart your Django service. The current service-worker cache version is `noriss-shell-v10`; close/reopen the app to finish the update after preserving/syncing local records.
 5. Do **not** rerun `setup_shop` if the owner and memberships already exist. Older single-item queue records still sync with this backend.
 
 The initial migration is unchanged; migration 0002 adds tables/columns without deleting old records. Existing stock with unknown acquisition cost remains explicitly unknown until depleted/replaced. Historical sales are retained; v1 sales without receipt objects remain in transaction history and are not silently assigned fictitious receipt numbers.

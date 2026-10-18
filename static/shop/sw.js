@@ -1,6 +1,6 @@
 /* Only public shell and same-origin static assets are cached. Private HTML/API
    responses and CSRF tokens are never put in Cache Storage. */
-const CACHE='noriss-shell-v9';
+const CACHE='noriss-shell-v10';
 const ASSETS=['/offline-shell/','/manifest.webmanifest','/static/shop/app.css','/static/shop/app.js','/static/shop/core.js','/static/shop/enhancements.js','/static/shop/storage.js','/static/shop/images/beauty-hero.webp','/static/shop/icons/icon-192.png','/static/shop/icons/icon-512.png','/static/shop/icons/maskable-512.png','/static/shop/icons/apple-touch-icon.png'];
 // The shell and executable modules are essential. Optional images/icons must not
 // prevent installation when an asset is unavailable or a proxy returns an error.

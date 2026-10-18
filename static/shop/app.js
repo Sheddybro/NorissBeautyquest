@@ -134,7 +134,7 @@ window.addEventListener('online',synchronise);window.addEventListener('offline',
 channel?.addEventListener('message',()=>readLocal().catch(e=>notify(e.message,true)));
 async function checkOfflineShell(){
  if(!('caches' in window))return false;
- const cache=await caches.open('noriss-shell-v9');
+ const cache=await caches.open('noriss-shell-v10');
  for(const url of ['/offline-shell/','/static/shop/app.js','/static/shop/core.js','/static/shop/storage.js','/static/shop/enhancements.js']){
   if(!await cache.match(url))return false;
  }

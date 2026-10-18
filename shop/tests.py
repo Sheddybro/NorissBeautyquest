@@ -20,10 +20,10 @@ class RetailTests(TestCase):
  def test_missing_membership(self):
   user=get_user_model().objects.create_user('unassigned');self.client.force_login(user);self.assertEqual(self.client.get('/api/bootstrap/').status_code,403)
  def test_templates(self):
-  app=self.client.get('/');self.assertContains(app,'Sync centre');self.assertContains(app,'entry-dialog');self.assertContains(app,'class="page-hero"');self.assertContains(app,'id="page-eyebrow"');self.assertContains(app,'aria-labelledby="page-title"');self.assertContains(self.client.get('/accounts/login/'),'Good to see you again.');offline=self.client.get('/offline-shell/');self.assertNotIn('csrfmiddlewaretoken',offline.content.decode());self.assertContains(offline,'app.js');self.assertContains(offline,'class="page-hero"')
+  app=self.client.get('/');self.assertContains(app,'Sync centre');self.assertContains(app,'entry-dialog');self.assertContains(app,'class="page-hero"');self.assertContains(app,'id="page-eyebrow"');self.assertContains(app,'aria-labelledby="page-title"');self.assertContains(app,'class="logout-label">Sign out</span>');self.assertContains(self.client.get('/accounts/login/'),'Good to see you again.');offline=self.client.get('/offline-shell/');self.assertNotIn('csrfmiddlewaretoken',offline.content.decode());self.assertContains(offline,'app.js');self.assertContains(offline,'class="page-hero"')
  def test_pwa_endpoints(self):
   manifest=self.client.get('/manifest.webmanifest');self.assertEqual(manifest.status_code,200);self.assertEqual(manifest.json()['display'],'standalone');self.assertEqual(len(manifest.json()['icons']),3)
-  response=self.client.get('/sw.js');self.assertContains(response,'noriss-shell-v9');self.assertEqual(response['Service-Worker-Allowed'],'/');self.assertIn('no-cache',response['Cache-Control'])
+  response=self.client.get('/sw.js');self.assertContains(response,'noriss-shell-v10');self.assertEqual(response['Service-Worker-Allowed'],'/');self.assertIn('no-cache',response['Cache-Control'])
  def test_health(self):self.assertEqual(self.client.get('/health/').json(),{'status':'ok'})
  def test_product_validation(self):
   for fields in [{'name':' '},{'name':'x'*101},{'price':0},{'price':True},{'price':1.5},{'reorder':-1},{'category':''},{'request_id':'not-uuid'}]:
