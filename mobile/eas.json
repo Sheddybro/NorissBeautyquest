@@ -1,8 +1,34 @@
 {
-  "cli": {"version": ">= 16.0.0"},
+  "cli": {
+    "version": ">= 16.0.0"
+  },
   "build": {
-    "development": {"developmentClient": true, "distribution": "internal", "android": {"buildType": "apk"}},
-    "preview": {"distribution": "internal", "android": {"buildType": "apk"}},
-    "production": {"android": {"buildType": "app-bundle"}}
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      }
+    },
+    "productionApk": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_WEB_URL": "https://norissbeautyquest.pythonanywhere.com/"
+      }
+    }
   }
 }

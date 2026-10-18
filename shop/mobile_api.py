@@ -2,17 +2,20 @@
 import json
 import secrets
 import hashlib
-from datetime import timedelta
+from datetime import date, timedelta
 from django.contrib.auth import authenticate
 from django.core.cache import cache
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db.models import BigIntegerField, ExpressionWrapper, F, Sum
+from django.db.models.functions import TruncDate
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from .models import MobileToken
+from .models import Expense, MobileToken, Movement, Receipt, Refund
 from .services import snapshot, member_for, ShopError, apply_operation
+from .permissions import can_operate
 
 def reply_error(message, status=400):
     return JsonResponse({'error': message}, status=status)
@@ -78,13 +81,20 @@ def me(request):
         return JsonResponse({'account':data['account']})
     except ShopError as e:return reply_error(e.message,e.status)
 
-@require_http_methods(['GET'])
+@csrf_exempt
+@require_http_methods(['GET', 'POST'])
 def products(request):
     user,_=auth_user(request)
     if not user:return reply_error('Authentication required.',401)
     try:
+        if request.method == 'POST':
+            data=parse(request)
+            if data.get('kind') not in {'product', 'product_update'}:
+                return reply_error('Expected product operation.')
+            return JsonResponse(apply_operation(user, data))
         data=snapshot(user)
         return JsonResponse({'products':data['products'],'updated':data['updated']})
+    except ValueError as e:return reply_error(str(e))
     except ShopError as e:return reply_error(e.message,e.status)
 
 @require_http_methods(['GET'])
@@ -93,7 +103,29 @@ def dashboard(request):
     if not user:return reply_error('Authentication required.',401)
     try:
         data=snapshot(user)
-        return JsonResponse({'account':data['account'],'products':data['products'],'receipts':data['receipts'][-10:],'updated':data['updated']})
+        store_id=data['account']['store_id']
+        today=timezone.localdate()
+        first_day=today-timedelta(days=6)
+        line_amount=ExpressionWrapper(F('quantity')*F('unit_amount'),output_field=BigIntegerField())
+        sales=Movement.objects.filter(store_id=store_id,kind='sale')
+        purchases=Movement.objects.filter(store_id=store_id,kind='purchase')
+        sales_today=sales.filter(created__date=today).aggregate(total=Sum(line_amount))['total'] or 0
+        purchases_today=purchases.filter(created__date=today).aggregate(total=Sum(line_amount))['total'] or 0
+        refunds_today=Refund.objects.filter(movement__store_id=store_id,created__date=today).aggregate(total=Sum('amount'))['total'] or 0
+        trend_rows=(sales.filter(created__date__gte=first_day,created__date__lte=today)
+            .annotate(day=TruncDate('created',tzinfo=timezone.get_current_timezone()))
+            .values('day').annotate(total=Sum(line_amount)).order_by('day'))
+        trend_totals={row['day'].isoformat():row['total'] or 0 for row in trend_rows}
+        sales_trend=[{'day':(first_day+timedelta(days=index)).isoformat(),'amount':trend_totals.get((first_day+timedelta(days=index)).isoformat(),0)} for index in range(7)]
+        metrics={
+            'sales_today':sales_today,
+            'purchases_today':purchases_today,
+            'refunds_today':refunds_today,
+            'net_sales_today':sales_today-refunds_today,
+            'transactions_today':Receipt.objects.filter(store_id=store_id,created__date=today).count(),
+            'sales_trend':sales_trend,
+        }
+        return JsonResponse({'account':data['account'],'products':data['products'],'receipts':data['receipts'][-10:],'metrics':metrics,'updated':data['updated']})
     except ShopError as e:return reply_error(e.message,e.status)
 
 
@@ -210,4 +242,85 @@ def purchase_mobile(request):
         if data.get('kind')!='purchase':return reply_error('Expected purchase operation.')
         return JsonResponse(apply_operation(user,data))
     except ValueError as e:return reply_error(str(e))
+    except ShopError as e:return reply_error(e.message,e.status)
+
+@csrf_exempt
+@require_http_methods(['GET', 'POST'])
+def expenses_mobile(request):
+    """Bearer-token expense workflow using the shared permission-checked ledger."""
+    user,_=auth_user(request)
+    if not user:return reply_error('Authentication required.',401)
+    try:
+        member=member_for(user)
+        if not can_operate(member,'expense'):return reply_error('Expense access required.',403)
+        if request.method=='POST':
+            data=parse(request)
+            if data.get('kind')!='expense':return reply_error('Expected expense operation.')
+            return JsonResponse(apply_operation(user,data))
+        expenses=[{
+            'id':str(row.id),
+            'description':row.description,
+            'amount':row.amount,
+            'payment':row.payment,
+            'created':row.created.isoformat(),
+        } for row in Expense.objects.filter(store=member.store).order_by('-created')[:100]]
+        return JsonResponse({'expenses':expenses})
+    except ValueError as e:return reply_error(str(e))
+    except ShopError as e:return reply_error(e.message,e.status)
+
+@require_http_methods(['GET'])
+def reports_mobile(request):
+    """Owner-only confirmed profit summary, calculated from the authoritative ledger."""
+    user,_=auth_user(request)
+    if not user:return reply_error('Authentication required.',401)
+    try:
+        member=member_for(user)
+        if member.role!='owner':return reply_error('Profit reports are restricted to the owner.',403)
+        start_raw=request.GET.get('from','').strip()
+        end_raw=request.GET.get('to','').strip()
+        try:
+            start=date.fromisoformat(start_raw) if start_raw else None
+            end=date.fromisoformat(end_raw) if end_raw else None
+        except ValueError:return reply_error('Report dates must use YYYY-MM-DD.',400)
+        if start and end and start>end:return reply_error('The report start date must not follow its end date.',400)
+
+        def in_range(queryset, field):
+            if start:queryset=queryset.filter(**{field+'__date__gte':start})
+            if end:queryset=queryset.filter(**{field+'__date__lte':end})
+            return queryset
+
+        sales=in_range(Movement.objects.filter(store=member.store,kind='sale'),'created')
+        refunds=in_range(Refund.objects.filter(movement__store=member.store),'created')
+        expenses=in_range(Expense.objects.filter(store=member.store),'created')
+        sales_amount=ExpressionWrapper(F('quantity')*F('unit_amount'),output_field=BigIntegerField())
+        gross_sales=sales.aggregate(total=Sum(sales_amount))['total'] or 0
+        known_sales=sales.filter(cost_known=True)
+        known_sales_amount=ExpressionWrapper(F('quantity')*F('unit_amount'),output_field=BigIntegerField())
+        known_revenue=known_sales.aggregate(total=Sum(known_sales_amount))['total'] or 0
+        known_count=sales.filter(cost_known=False).count()
+        refunds_total=refunds.aggregate(total=Sum('amount'))['total'] or 0
+        known_refunds=refunds.filter(movement__cost_known=True)
+        known_refund_amount=known_refunds.aggregate(total=Sum('amount'))['total'] or 0
+        restocked_known_cost=known_refunds.filter(restock=True).aggregate(total=Sum('cost_total'))['total'] or 0
+        cost_of_goods_sold=(known_sales.aggregate(total=Sum('cost_total'))['total'] or 0)-restocked_known_cost
+        expense_total=expenses.aggregate(total=Sum('amount'))['total'] or 0
+        net_sales=gross_sales-refunds_total
+        known_net=known_revenue-known_refund_amount
+        rows=[{
+            'id':str(row.id),
+            'description':row.description,
+            'amount':row.amount,
+            'payment':row.payment,
+            'created':row.created.isoformat(),
+        } for row in expenses.order_by('-created')[:200]]
+        return JsonResponse({'from':start.isoformat() if start else '', 'to':end.isoformat() if end else '', 'metrics':{
+            'gross_sales':gross_sales,
+            'refunds':refunds_total,
+            'net_sales':net_sales,
+            'cost_of_goods_sold':cost_of_goods_sold,
+            'known_cost_gross_profit':known_net-cost_of_goods_sold,
+            'expenses':expense_total,
+            'estimated_operating_profit':known_net-cost_of_goods_sold-expense_total,
+            'unknown_cost_sales':known_count,
+        },'expenses_list':rows})
     except ShopError as e:return reply_error(e.message,e.status)

@@ -146,15 +146,33 @@ class DemoSeedTests(TestCase):
  def test_seed_demo_populates_full_dataset_idempotently(self):
   import io
   from django.core.management import call_command
-  from .models import Expense,Operation,Reconciliation,Refund
+  from .models import Branch,Expense,Operation,PaymentAttempt,Reconciliation,Refund
   store=Store.objects.create();owner=get_user_model().objects.create_user('demoowner');Membership.objects.create(user=owner,store=store,role='owner')
-  call_command('seed_demo',owner='demoowner',stdout=io.StringIO())
+  call_command('seed_demo',owner='demoowner',scale=1,stdout=io.StringIO())
   counts=(Product.objects.count(),Movement.objects.count(),Operation.objects.count(),Receipt.objects.count(),Batch.objects.count(),Refund.objects.count(),Expense.objects.count(),Reconciliation.objects.count())
-  self.assertEqual(counts[0],9);self.assertGreater(counts[1],20);self.assertGreaterEqual(counts[2],40);self.assertEqual(counts[3],14);self.assertGreaterEqual(counts[4],9);self.assertEqual(counts[5],1);self.assertEqual(counts[6],5);self.assertLessEqual(counts[7],1)
+  self.assertEqual(counts[0],9);self.assertGreater(counts[1],20);self.assertGreaterEqual(counts[2],40);self.assertEqual(counts[3],14);self.assertGreaterEqual(counts[4],9);self.assertEqual(counts[5],2);self.assertEqual(counts[6],5);self.assertGreater(counts[7],1)
   self.assertTrue(all(p.name.startswith('Demo ·') for p in Product.objects.all()))
   self.assertTrue(all(m.party.startswith('Demo ') for m in Movement.objects.filter(kind='sale')))
-  call_command('seed_demo',owner='demoowner',stdout=io.StringIO())
+  today_purchases=Movement.objects.filter(store=store,kind='purchase',created__date=timezone.localdate())
+  self.assertEqual(today_purchases.count(),3)
+  self.assertTrue(Product.objects.get(name='Demo · Glow serum').photo.startswith('data:image/png;base64,'))
+  self.assertTrue(Product.objects.get(name='Demo · Glow serum').barcode.startswith(f'DEMO{store.id}-'))
+  self.assertTrue(Product.objects.filter(active=False).exists())
+  self.assertTrue(Batch.objects.filter(expires__lt=timezone.localdate()).exists())
+  self.assertTrue(Refund.objects.filter(restock=False).exists())
+  self.assertEqual(Membership.objects.filter(store=store).count(),4)
+  self.assertEqual(Branch.objects.filter(store=store).count(),3)
+  self.assertEqual(set(PaymentAttempt.objects.filter(store=store).values_list('status',flat=True)),{'pending','verified','failed','cancelled','refunded'})
+  self.assertGreater(AuditLog.objects.filter(store=store).count(),0)
+  call_command('seed_demo',owner='demoowner',scale=1,stdout=io.StringIO())
   self.assertEqual((Product.objects.count(),Movement.objects.count(),Operation.objects.count(),Receipt.objects.count(),Batch.objects.count(),Refund.objects.count(),Expense.objects.count(),Reconciliation.objects.count()),counts)
+  self.assertEqual(today_purchases.count(),3)
+  Product.objects.create(store=store,name='Keep this product',category='Other',price=1000)
+  call_command('clear_demo',owner='demoowner',yes=True,stdout=io.StringIO())
+  self.assertEqual(list(Product.objects.values_list('name',flat=True)),['Keep this product'])
+  self.assertEqual((Movement.objects.count(),Operation.objects.count(),Receipt.objects.count(),Batch.objects.count(),Refund.objects.count(),Expense.objects.count(),Reconciliation.objects.count()),(0,0,0,0,0,0,0))
+  self.assertEqual(list(Branch.objects.filter(store=store).values_list('code',flat=True)),['main'])
+  self.assertEqual(Membership.objects.filter(store=store).count(),1)
 
 class StaffPermissionTests(RetailTests):
  def test_staff_defaults_and_owner_access(self):

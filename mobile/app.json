@@ -1,1 +1,17 @@
-{"expo":{"name":"Noriss Beautyquest","slug":"noriss-beautyquest","scheme":"norissbeautyquest","version":"0.1.0","orientation":"portrait","android":{"package":"com.norissbeautyquest.retail"},"plugins":["expo-router","expo-secure-store"]}}
+{
+  "expo": {
+    "name": "Noriss Beautyquest",
+    "slug": "noriss-beautyquest",
+    "scheme": "norissbeautyquest",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "android": {
+      "package": "com.norissbeautyquest.retail",
+      "versionCode": 1
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ]
+  }
+}

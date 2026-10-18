@@ -1,6 +1,61 @@
-# Noriss Beautyquest v2 — Django retail web app + offline PWA
+# Noriss Beautyquest
 
-A Python/Django 5.2 LTS implementation of the blue and purple Noriss Beautyquest retail manager. The interface uses Django templates, local CSS and vanilla JavaScript. **No React, no Node.js build and no external APIs are needed to run the app.** JavaScript is included because browsers require it for service workers, IndexedDB, installation and offline synchronisation.
+A Django retail system with a companion Expo/React Native client. The web app remains the source of truth for business logic and the mobile app connects to the same backend APIs.
+
+## Mobile app quick start
+
+1. Install the Python dependencies:
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+2. Start the Django backend:
+
+```powershell
+python manage.py migrate
+python manage.py runserver 0.0.0.0:8000
+```
+
+3. Set the Expo API base to your current machine or LAN address:
+
+```env
+EXPO_PUBLIC_API_URL=http://localhost:8000
+```
+
+If the app is running on another device on your LAN, replace `localhost` with that computer's current LAN IP. Keep the URL stable for the session and avoid hardcoding a stale IP in source files.
+
+4. Start Expo:
+
+```powershell
+cd mobile
+npm install
+npx expo start --android
+```
+
+5. Sign in with a valid owner or staff account and keep the app open while testing connectivity.
+
+### Required checks
+
+```powershell
+cd mobile
+npm run typecheck
+npm test
+cd ..
+python manage.py check
+python manage.py test shop
+```
+
+### Production and support notes
+
+- Use a stable HTTPS domain for production.
+- Keep `EXPO_PUBLIC_API_URL` outside source control if it differs by environment.
+- Keep authentication tokens out of logs and avoid exposing raw API errors to end users.
+- The app should show a compact diagnostics summary, not a full stack trace, on normal login screens.
+
+## Web app notes
+
+The project still includes the Django web PWA and backend features. Preserve the existing database and business rules while making the mobile client match the working web experience.
 
 ## What is included
 
@@ -42,13 +97,23 @@ You can use the virtual environment directly without changing PowerShell executi
 
 Open **http://127.0.0.1:8000/** and sign in with the credentials you chose. Wait for **Offline ready** in the Sync centre.
 
-To populate an owner shop with a full, repeatable sample dataset:
+To populate the current owner shop with a full, repeatable sample dataset, run this from the project root after creating the virtual environment and before working on mobile testing:
 
 ```powershell
 .\.venv\Scripts\python.exe manage.py seed_demo --owner owner
 ```
 
-This creates clearly labeled demo products, purchase lots, recent sales and receipts, one partial refund, expenses, and a reconciliation for the sample reporting screens. It is safe to rerun; existing demo operations are not duplicated. These are fictional records for testing only—do not run this command in a live shop.
+This creates a repeatable 100x sample: 900 products, 1,400 multi-line checkouts, 500 expenses, varied purchase batches and expiry dates, refunds, reconciliations, and representative records for product photos/barcodes/archive, staff roles, branches, payment states, receipts, audit, and reporting. Demo staff users have unusable passwords, and no mobile access tokens are created. Existing operations are not duplicated on rerun. These fictional records are for testing only; do not run this command in a live shop.
+
+Each run also adds three replenishment purchases dated today; rerunning on the same day does not duplicate them.
+
+To remove the generated records while keeping other shop data, run `python manage.py clear_demo --owner owner`. The command summarizes what it found and asks for confirmation; append `--yes` to skip the prompt. The main branch is retained.
+
+Use `--scale 1` for the compact base dataset, or choose a value from 1 to 100:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py seed_demo --owner owner --scale 10
+```
 
 ## macOS / Linux
 

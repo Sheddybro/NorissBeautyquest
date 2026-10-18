@@ -1,10 +1,33 @@
 import React from 'react';
-import {StyleSheet,Text,TouchableOpacity,View} from 'react-native';
-import {palette} from '../theme/tokens';
-const symbols:Record<string,string>={Home:'⌂',Inventory:'▦',Checkout:'⊕',Receipts:'▤'};
-type Props={items:string[];active:string;onSelect:(item:string)=>void};
-/** Primary mobile navigation; permission-filtered by the parent. */
-export function BottomNavigation({items,active,onSelect}:Props){
- return <View style={styles.bar} accessibilityLabel="Primary navigation">{items.map(item=><TouchableOpacity key={item} onPress={()=>onSelect(item)} accessibilityRole="tab" accessibilityLabel={item} accessibilityState={{selected:item===active}} style={[styles.item,item===active&&styles.active]}><Text style={[styles.symbol,item===active&&styles.selected]}>{symbols[item]||'•'}</Text><Text style={[styles.label,item===active&&styles.selected]}>{item}</Text></TouchableOpacity>)}</View>;
+import { StyleSheet, Text, Pressable, View } from 'react-native';
+import { palette } from '../theme/tokens';
+
+const symbols: Record<string, string> = { Home: '⌂', Inventory: '▦', Checkout: '⊕', Sell: '⊕', Receipts: '▤', More: '☷' };
+type Props = { items: string[]; active: string; onSelect: (item: string) => void };
+/** Permission-filtered primary navigation; only the parent can authorize actions. */
+export function BottomNavigation({ items, active, onSelect }: Props) {
+  return (
+    <View style={styles.bar} accessibilityRole="tablist" accessibilityLabel="Primary navigation">
+      {items.map((item) => {
+        const selected = item === active;
+        return (
+          <Pressable key={item} onPress={() => { if (!selected) onSelect(item); }}
+            accessibilityRole="tab" accessibilityLabel={item} accessibilityState={{ selected }}
+            style={({ pressed }) => [styles.item, selected && styles.active, pressed && !selected && styles.pressed]}>
+            <Text accessible={false} style={[styles.symbol, selected && styles.selected]}>{symbols[item] || '•'}</Text>
+            <Text style={[styles.label, selected && styles.selected]} numberOfLines={1}>{item}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
 }
-const styles=StyleSheet.create({bar:{flexDirection:'row',justifyContent:'space-around',backgroundColor:'#fff',borderTopWidth:1,borderTopColor:'#e6eaf3',paddingTop:10,paddingBottom:9,marginHorizontal:-16,paddingHorizontal:10,elevation:8},item:{minHeight:53,flex:1,alignItems:'center',justifyContent:'center',borderRadius:15},active:{backgroundColor:'#efedff'},symbol:{fontSize:24,color:'#8490ab',fontWeight:'800'},label:{fontSize:10,fontWeight:'700',color:'#78849c',marginTop:2},selected:{color:palette.primaryDark}});
+const styles = StyleSheet.create({
+  bar: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: '#fff', borderTopWidth: 1,
+    borderTopColor: '#e6eaf3', paddingTop: 9, paddingBottom: 9, marginHorizontal: -16, paddingHorizontal: 8, elevation: 8 },
+  item: { minHeight: 58, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 16, paddingHorizontal: 2 },
+  active: { backgroundColor: '#EDF1FF' }, pressed: { backgroundColor: '#F4F6FB' },
+  symbol: { fontSize: 23, color: '#8490ab', fontWeight: '800' },
+  label: { fontSize: 11, fontWeight: '700', color: '#78849c', marginTop: 3 },
+  selected: { color: palette.primary },
+});
