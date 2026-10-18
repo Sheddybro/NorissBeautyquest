@@ -117,6 +117,8 @@ tbody tr:hover{background:#f7f8fe}
 .remember{margin:8px 0 14px;display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
 .remember input{accent-color:var(--blue);width:16px;height:16px}
 .login-form .full{width:100%}
+.app-access{margin-top:12px}.install-app-link{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px 16px;border:1px solid #d8dff0;border-radius:10px;background:#edf1ff;color:#3655bb;font-size:13px;font-weight:700;text-decoration:none;transition:background .2s,border-color .2s,transform .2s}.install-app-link:hover{background:#e3eaff;border-color:#9baeea;transform:translateY(-1px)}.install-app-link:focus-visible{outline:3px solid #a997ee;outline-offset:3px}.iphone-note{margin:10px 2px 0;color:#687493;font-size:11px;line-height:1.6}.iphone-note strong{color:#172653}.iphone-note a{color:#3655bb;font-weight:600}
+
 .avatar{background:#d84b93;border-color:#f39bc3;color:#fff}
 .offline-note{color:#77839d}
 .receipt-preview{border-color:#e5e8f1;border-radius:12px}

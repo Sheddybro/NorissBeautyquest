@@ -94,7 +94,7 @@ async function synchronise(){if(state.syncing||!state.storageOK)return;state.syn
    const response=await network('/api/operations/',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRFToken':state.csrf},body:JSON.stringify(entry.payload)});
    let data;try{data=await response.json()}catch{if(response.status===403){state.authRequired=true;break}throw Error('Could not confirm the save. It remains pending.')}
    if(response.status===401){state.authRequired=true;break}
-   if(!response.ok){if(response.status>=500)throw Error(data.error||'Server unavailable.');entry.status='conflict';entry.error=data.error||'Review this record.';await storage.putEntry(entry);notify('A local record needs review in the Sync centre.',true);break}
+    if(!response.ok){if(response.status>=500)throw Error(data.error||'Server unavailable.');entry.status='conflict';entry.error=data.error||'Review this record.';await storage.putEntry(entry);await bootstrap();notify('A local record needs review in the Sync centre.',true);break}
    if(!await bootstrap())break;
    if(!state.queue.some(e=>e.id===entry.id))continue;
    throw Error('Record was acknowledged but the updated snapshot is not available yet. Retry syncing.');
@@ -127,7 +127,7 @@ $('primary-action').onclick=()=>openForm(state.view==='Inventory'?'product':stat
 $('entry-form').onsubmit=submit;$('close-dialog').onclick=()=>{if(!state.saving)$('entry-dialog').close()};$('entry-dialog').addEventListener('cancel',e=>{if(state.saving)e.preventDefault()});$('product-select').onchange=updatePrice;$('quantity').oninput=updateTotal;$('unit-amount').oninput=updateTotal;
 document.addEventListener('click',e=>{const empty=e.target.closest('[data-empty-action]');if(empty){if(empty.dataset.emptyAction==='clear'){state.search='';$('search').value='';renderTable()}else openForm(empty.dataset.emptyAction)}const q=e.target.closest('[data-queue-action]');if(q)queueAction(q.dataset.queueAction,q.dataset.id).catch(e=>notify(e.message,true))});
 const isPhone=/Android|iPhone|iPod|Mobile/i.test(navigator.userAgent);
-if(isPhone){$('install-help').hidden=true;$('install-btn').hidden=true;$('offline-readiness-badge').hidden=true;}
+if(isPhone){$('install-help').hidden=true;$('install-btn').hidden=true;}
 $('install-help').onclick=()=>$('help-dialog').showModal();$('close-help').onclick=()=>$('help-dialog').close();
 window.addEventListener('beforeinstallprompt',e=>{if(isPhone)return;e.preventDefault();deferredPrompt=e;$('install-btn').hidden=false});$('install-btn').onclick=async()=>{if(!deferredPrompt)return;await deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$('install-btn').hidden=true};window.addEventListener('appinstalled',()=>{$('install-btn').hidden=true;notify('Noriss Beautyquest has been installed.')});
 window.addEventListener('online',synchronise);window.addEventListener('offline',()=>{state.connected=false;render()});document.addEventListener('visibilitychange',()=>{if(!document.hidden)synchronise()});
@@ -150,7 +150,7 @@ async function refreshOfflineReadiness(){
 async function start(){try{
  await storage.openDB();state.storageOK=true;await readLocal();
  if(navigator.storage?.persist)navigator.storage.persist().catch(()=>{});
- if(!isPhone&&'serviceWorker' in navigator&&window.isSecureContext){
+ if('serviceWorker' in navigator&&window.isSecureContext){
   try{
    const registration=await navigator.serviceWorker.register('/sw.js');
    registration.update().catch(()=>{});
@@ -158,7 +158,7 @@ async function start(){try{
    const ready=await Promise.race([navigator.serviceWorker.ready.then(()=>true),new Promise(resolve=>setTimeout(()=>resolve(false),20000))]);
    if(!ready)notify('Offline installation is still pending. Inspect /sw.js and its essential assets in DevTools.',true);
   }catch(e){notify('Offline installation failed: '+(e.message||String(e)),true);}
- }else if(!isPhone)notify('Offline installation requires HTTPS or localhost.',true);
+ }else if(!window.isSecureContext)notify('Offline installation requires HTTPS or localhost.',true);
  await synchronise();await refreshOfflineReadiness();
  if(!isPhone)navigator.serviceWorker?.addEventListener('controllerchange',()=>refreshOfflineReadiness());
  setInterval(()=>{if(!document.hidden)synchronise()},5000);
